@@ -127,3 +127,33 @@ async def get_task(task_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
             for s in task.steps
         ],
     }
+
+# ── Memory routes ─────────────────────────────────────────────────────────────
+
+class MemoryRequest(BaseModel):
+    key:   str
+    value: str
+
+
+@router.get("/memory")
+async def get_memory():
+    """Get all stored user preferences."""
+    from app.agents.memory import get_all_preferences
+    prefs = await get_all_preferences()
+    return {"preferences": prefs}
+
+
+@router.post("/memory")
+async def set_memory(body: MemoryRequest):
+    """Save a user preference."""
+    from app.agents.memory import save_preference
+    await save_preference(key=body.key, value=body.value)
+    return {"status": "saved", "key": body.key, "value": body.value}
+
+
+@router.delete("/memory/{key}")
+async def delete_memory(key: str):
+    """Delete a user preference."""
+    from app.agents.memory import delete_preference
+    await delete_preference(key=key)
+    return {"status": "deleted", "key": key}

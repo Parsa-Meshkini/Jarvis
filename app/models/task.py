@@ -1,4 +1,3 @@
-# app/models/task.py
 import uuid
 from datetime import datetime
 from enum import Enum
@@ -49,3 +48,17 @@ class TaskStep(Base):
     created_at: Mapped[datetime]   = mapped_column(DateTime, default=datetime.utcnow)
 
     task: Mapped["Task"] = relationship("Task", back_populates="steps")
+
+
+class UserMemory(Base):
+    """
+    Stores persistent user preferences and context.
+    One row per key — upserted on every save.
+    """
+    __tablename__ = "user_memory"
+
+    id:         Mapped[uuid.UUID]  = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id:    Mapped[str]        = mapped_column(String(100), nullable=False, index=True)
+    key:        Mapped[str]        = mapped_column(String(100), nullable=False)
+    value:      Mapped[str]        = mapped_column(Text, nullable=False)
+    updated_at: Mapped[datetime]   = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
