@@ -1,16 +1,24 @@
+import json
+from app.services.llm_service import generate_plan
+from app.agents.prompts import SYSTEM_PROMPT
+
+
 async def plan_task(user_input: str):
     """
-    Converts user request into a task plan.
-    (Later powered by LLM reasoning)
+    Uses LLM to create execution plan.
     """
 
-    if "haircut" in user_input.lower():
-        return [
-            "check_calendar",
-            "search_salons",
-            "call_salon",
-            "confirm_booking",
-            "add_to_calendar",
-        ]
+    raw_response = await generate_plan(
+        user_input,
+        SYSTEM_PROMPT
+    )
 
-    return ["unknown_task"]
+    try:
+        plan = json.loads(raw_response)
+        return plan
+    except Exception:
+        return {
+            "goal": "error",
+            "steps": [],
+            "raw_output": raw_response
+        }

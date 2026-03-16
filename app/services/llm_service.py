@@ -1,12 +1,32 @@
-from app.core.config import settings
-from openai import OpenAI
+import os
+import json
+import google.generativeai as genai
+from dotenv import load_dotenv
 
-client = OpenAI(api_key=settings.OPENAI_API_KEY)
+load_dotenv()
 
-async def ask_llm(prompt: str):
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": prompt}],
-    )
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
-    return response.choices[0].message.content
+model = genai.GenerativeModel("gemini-2.5-flash-lite")
+
+async def generate_plan(system_prompt: str, user_input: str):
+
+    full_prompt = f"""
+    {system_prompt}
+
+    USER REQUEST:
+    {user_input}
+
+    Respond ONLY with valid JSON.
+    """
+
+    response = model.generate_content(full_prompt)
+
+    text = response.text
+
+    try:
+        return json.loads(text)
+    except:
+        start = text.find("{")
+        end = text.rfind("}") + 1
+        return json.loads(text[start:end])
