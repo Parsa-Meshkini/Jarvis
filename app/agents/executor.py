@@ -1,7 +1,7 @@
 import logging
 from app.tools.calendar_tool import check_calendar, add_to_calendar
-from app.tools.search_tool import search_salons, call_salon, confirm_booking
-from app.tools.calling import call_business
+from app.tools.search_tool   import search_salons, call_salon, confirm_booking
+from app.tools.calling       import call_business
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +27,7 @@ async def execute_plan(plan: dict) -> dict:
 
         logger.info(f"Step {i+1}/{len(steps)}: {tool_name}")
 
+        # Pass context from previous steps into this step's params
         merged_params = {**context, **params}
         tool = TOOL_MAP.get(tool_name)
 
@@ -49,7 +50,17 @@ async def execute_plan(plan: dict) -> dict:
                 "status": "completed",
                 "output": output,
             })
-            context.update(output if isinstance(output, dict) else {})
+            # Carry useful output into next steps
+            if isinstance(output, dict):
+                # Pass salon name forward so call_business knows who was booked
+                if output.get("top_pick"):
+                    context["name"]       = output["top_pick"].get("name")
+                    context["salon_name"] = output["top_pick"].get("name")
+                if output.get("date"):
+                    context["date"] = output["date"]
+                if output.get("time"):
+                    context["time"] = output["time"]
+                context.update({k: v for k, v in output.items() if v})
 
         except Exception as exc:
             results.append({
@@ -64,5 +75,7 @@ async def execute_plan(plan: dict) -> dict:
         "goal":    plan.get("goal", "unknown"),
         "total":   len(steps),
         "results": results,
-        "status":  "completed" if all(r["status"] == "completed" for r in results) else "partial",
+        "status":  "completed" if all(
+            r["status"] == "completed" for r in results
+        ) else "partial",
     }
