@@ -10,7 +10,7 @@ load_dotenv()
 
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
-model = genai.GenerativeModel("gemini-2.5-flash-lite")
+model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-1.5-flash"))
 
 # Thread pool for running sync Gemini calls without blocking
 _executor = ThreadPoolExecutor(max_workers=4)

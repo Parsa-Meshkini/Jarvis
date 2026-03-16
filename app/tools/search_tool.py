@@ -1,36 +1,34 @@
-# app/tools/search_tool.py
 import httpx
-import os
-from dotenv import load_dotenv
+import logging
+from app.core.config import settings
 
-load_dotenv()
-
-MAPS_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "")
+logger = logging.getLogger(__name__)
 
 
 async def search_salons(params: dict = {}) -> dict:
     location = params.get("location", "Toronto, ON")
-    query    = params.get("query", "hair salon")
-    service  = params.get("service", "haircut")
 
-    # If no Maps key, fall back to stubs so app doesn't crash
-    if not MAPS_KEY:
+    # Use query directly — don't force "hair salon"
+    query   = params.get("query", "")
+    service = params.get("service", "")
+    keyword = query or service or "business"
+
+    if not settings.GOOGLE_MAPS_API_KEY:
+        logger.warning("No GOOGLE_MAPS_API_KEY — using stub data")
         return {
-            "status":  "success",
-            "message": "No Maps API key — using stub data",
-            "results": [
-                {"name": "Style Studio",    "address": "123 Main St", "rating": 4.8},
-                {"name": "The Hair Lounge", "address": "456 King St", "rating": 4.6},
+            "status":   "success",
+            "message":  f"No Maps API key — using stub data for '{keyword}'",
+            "results":  [
+                {"name": "Example Place 1", "address": "123 Main St", "rating": 4.8},
+                {"name": "Example Place 2", "address": "456 King St", "rating": 4.6},
             ],
-            "top_pick": {"name": "Style Studio", "address": "123 Main St"},
+            "top_pick": {"name": "Example Place 1", "address": "123 Main St"},
         }
 
     async with httpx.AsyncClient(timeout=10) as client:
-
-        # Step 1: geocode location string → lat/lng
         geo = await client.get(
             "https://maps.googleapis.com/maps/api/geocode/json",
-            params={"address": location, "key": MAPS_KEY},
+            params={"address": location, "key": settings.GOOGLE_MAPS_API_KEY},
         )
         geo_data = geo.json()
 
@@ -40,20 +38,18 @@ async def search_salons(params: dict = {}) -> dict:
         lat = geo_data["results"][0]["geometry"]["location"]["lat"]
         lng = geo_data["results"][0]["geometry"]["location"]["lng"]
 
-        # Step 2: search nearby places
         places = await client.get(
             "https://maps.googleapis.com/maps/api/place/nearbysearch/json",
             params={
                 "location": f"{lat},{lng}",
                 "radius":   2000,
-                "keyword":  f"{query} {service}",
-                "key":      MAPS_KEY,
+                "keyword":  keyword,       # ← uses whatever was actually searched
+                "key":      settings.GOOGLE_MAPS_API_KEY,
             },
         )
         data = places.json()
 
-    results = data.get("results", [])[:5]
-
+    results    = data.get("results", [])[:5]
     businesses = [
         {
             "name":     p.get("name"),
@@ -67,7 +63,7 @@ async def search_salons(params: dict = {}) -> dict:
 
     return {
         "status":   "success",
-        "query":    query,
+        "query":    keyword,
         "location": location,
         "results":  businesses,
         "top_pick": businesses[0] if businesses else None,

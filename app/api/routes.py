@@ -32,38 +32,44 @@ async def command(
     body: CommandRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    # 1. Save task immediately
-    task = Task(
-        user_request=body.user_input,
-        status=TaskStatus.QUEUED,
-    )
+    task = Task(user_request=body.user_input, status=TaskStatus.QUEUED)
     db.add(task)
     await db.commit()
     await db.refresh(task)
 
-    # 2. Try to enqueue via ARQ — fall back to sync if Redis unavailable
     try:
         redis = await _get_arq()
         await redis.enqueue_job("run_agent_task", str(task.id), body.user_input)
         await redis.aclose()
         return {
-            "task_id":   str(task.id),
-            "status":    "queued",
-            "message":   "Task queued. Poll /tasks/{task_id} for updates.",
-            "request":   body.user_input,
+            "task_id": str(task.id),
+            "status":  "queued",
+            "message": "Task queued. Poll /tasks/{task_id} for updates.",
+            "request": body.user_input,
         }
     except Exception:
-        # Redis not running — execute synchronously so app still works
         logger.warning("Redis unavailable — running task synchronously")
         try:
             task.status = TaskStatus.PLANNING
             await db.commit()
 
-            plan      = await plan_task(body.user_input)
+            plan = await plan_task(body.user_input)
+
+            # Check if LLM returned an error plan
+            if plan.get("goal") in ("rate_limit_error", "llm_error", "parse_error"):
+                task.status = TaskStatus.FAILED
+                task.result = plan.get("error", "LLM error")
+                await db.commit()
+                from fastapi import HTTPException
+                raise HTTPException(
+                    status_code=429 if plan.get("goal") == "rate_limit_error" else 500,
+                    detail=plan.get("error", "LLM error — try again in a moment")
+                )
+
             task.status = TaskStatus.EXECUTING
             await db.commit()
 
-            execution = await execute_plan(plan)
+            execution   = await execute_plan(plan)
             task.status = TaskStatus.COMPLETED
             task.result = execution.get("status", "completed")
             await db.commit()
@@ -74,12 +80,12 @@ async def command(
                 "plan":      plan,
                 "execution": execution,
             }
+
         except Exception as exc:
             task.status = TaskStatus.FAILED
             task.result = str(exc)
             await db.commit()
             raise
-
 
 @router.get("/tasks")
 async def list_tasks(db: AsyncSession = Depends(get_db)):

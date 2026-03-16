@@ -6,11 +6,14 @@ from app.tools.calling       import call_business
 logger = logging.getLogger(__name__)
 
 TOOL_MAP = {
-    "check_calendar":  check_calendar,
+    # Generic search — works for anything
+    "search_places":   search_salons,
     "search_salons":   search_salons,
+
     "call_salon":      call_salon,
     "call_business":   call_business,
     "confirm_booking": confirm_booking,
+    "check_calendar":  check_calendar,
     "add_to_calendar": add_to_calendar,
 }
 
@@ -27,7 +30,6 @@ async def execute_plan(plan: dict) -> dict:
 
         logger.info(f"Step {i+1}/{len(steps)}: {tool_name}")
 
-        # Pass context from previous steps into this step's params
         merged_params = {**context, **params}
         tool = TOOL_MAP.get(tool_name)
 
@@ -50,9 +52,7 @@ async def execute_plan(plan: dict) -> dict:
                 "status": "completed",
                 "output": output,
             })
-            # Carry useful output into next steps
             if isinstance(output, dict):
-                # Pass salon name forward so call_business knows who was booked
                 if output.get("top_pick"):
                     context["name"]       = output["top_pick"].get("name")
                     context["salon_name"] = output["top_pick"].get("name")
