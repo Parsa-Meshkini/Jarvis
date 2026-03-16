@@ -1,9 +1,21 @@
+# app/main.py
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from app.api.routes import router
 from app.core.config import settings
+from app.database import engine, Base
 
-app = FastAPI(title=settings.APP_NAME)
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Create all tables on startup
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield
+    await engine.dispose()
+
+
+app = FastAPI(title=settings.APP_NAME, lifespan=lifespan)
 app.include_router(router)
 
 

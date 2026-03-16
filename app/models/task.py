@@ -1,3 +1,4 @@
+# app/models/task.py
 import uuid
 from datetime import datetime
 from enum import Enum
@@ -23,13 +24,11 @@ class Task(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    user_request: Mapped[str] = mapped_column(Text, nullable=False)
-    status: Mapped[str] = mapped_column(
-        String(20), default=TaskStatus.QUEUED, nullable=False
-    )
-    result: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(
+    user_request: Mapped[str]      = mapped_column(Text, nullable=False)
+    status:       Mapped[str]      = mapped_column(String(20), default=TaskStatus.QUEUED)
+    result:       Mapped[str|None] = mapped_column(Text, nullable=True)
+    created_at:   Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at:   Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
     steps: Mapped[list["TaskStep"]] = relationship(
@@ -43,12 +42,10 @@ class TaskStep(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    task_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("tasks.id"), nullable=False
-    )
-    step_name: Mapped[str] = mapped_column(String(100), nullable=False)
-    status: Mapped[str] = mapped_column(String(20), default="pending")
-    output: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    task_id:    Mapped[uuid.UUID]  = mapped_column(UUID(as_uuid=True), ForeignKey("tasks.id"))
+    step_name:  Mapped[str]        = mapped_column(String(100))
+    status:     Mapped[str]        = mapped_column(String(20), default="pending")
+    output:     Mapped[str|None]   = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime]   = mapped_column(DateTime, default=datetime.utcnow)
 
     task: Mapped["Task"] = relationship("Task", back_populates="steps")
