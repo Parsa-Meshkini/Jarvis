@@ -71,11 +71,36 @@ async def execute_plan(plan: dict) -> dict:
             })
             logger.error(f"Tool {tool_name} failed: {exc}")
 
+    # Determine overall status
+    completed = [r for r in results if r["status"] == "completed"]
+    failed    = [r for r in results if r["status"] == "failed"]
+
+    if len(failed) == 0:
+        overall = "completed"
+    elif len(completed) == 0:
+        overall = "failed"
+    else:
+        overall = "partial"
+
+    # Build a human-readable summary
+    summary_parts = []
+    for r in results:
+        tool = r["tool"]
+        out  = r.get("output", {})
+        if tool == "search_places" and out.get("top_pick"):
+            summary_parts.append(f"Found {out['top_pick']['name']}")
+        elif tool == "check_calendar":
+            avail = "free" if out.get("available") else "busy"
+            summary_parts.append(f"Calendar: {avail} on {out.get('date', 'requested date')}")
+        elif tool == "call_business":
+            summary_parts.append(f"Called {out.get('business', 'business')}: {out.get('status', 'unknown')}")
+        elif tool == "add_to_calendar" and out.get("status") == "created":
+            summary_parts.append(f"Added to calendar: {out.get('title', 'appointment')}")
+
     return {
         "goal":    plan.get("goal", "unknown"),
         "total":   len(steps),
         "results": results,
-        "status":  "completed" if all(
-            r["status"] == "completed" for r in results
-        ) else "partial",
+        "status":  overall,
+        "summary": " → ".join(summary_parts),
     }

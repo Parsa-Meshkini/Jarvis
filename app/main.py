@@ -8,6 +8,7 @@ from app.api.voice  import router as voice_router
 from app.api.auth   import router as auth_router
 from app.core.config import settings
 from app.database import engine, Base
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 
 @asynccontextmanager
@@ -19,6 +20,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title=settings.APP_NAME, lifespan=lifespan, redirect_slashes=False)
+
+# Trust proxy headers from ngrok so HTTPS requests are handled correctly
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
 app.add_middleware(
     CORSMiddleware,

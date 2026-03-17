@@ -30,6 +30,11 @@ export default function TaskCard({ task, isLatest = false }) {
               </span>
             )}
           </div>
+          {task.execution?.summary && (
+            <p className="text-jarvis-sub text-xs mt-2 font-mono opacity-80">
+              {task.execution.summary}
+            </p>
+          )}
         </div>
         <span className={`text-jarvis-muted text-xs mt-1 transition-transform ${open ? 'rotate-180' : ''}`}>▾</span>
       </button>

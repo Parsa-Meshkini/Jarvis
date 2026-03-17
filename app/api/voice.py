@@ -310,14 +310,107 @@ async def voice_status(call_sid: str):
 
 @router.get("/voice/active")
 async def active_calls():
-    return {
-        "active_calls": [
-            {
+    from app.tools.calling import booking_calls
+
+    # Combine inbound conversations + outbound booking calls
+    active = []
+
+    for sid, h in conversations.items():
+        if not sid.endswith("_empty"):
+            active.append({
                 "call_sid":     sid,
                 "turns":        len(h),
                 "last_message": h[-1]["content"] if h else "",
-            }
-            for sid, h in conversations.items()
-            if not sid.endswith("_empty")
-        ]
+                "type":         "inbound",
+            })
+
+    for sid, ctx in booking_calls.items():
+        transcript = ctx.get("transcript", [])
+        active.append({
+            "call_sid":     sid,
+            "turns":        len(transcript),
+            "last_message": transcript[-1]["content"] if transcript else ctx.get("status", "calling"),
+            "type":         "outbound",
+            "business":     ctx.get("business_name", ""),
+            "status":       ctx.get("status", "calling"),
+        })
+
+    return {"active_calls": active}
+
+
+@router.get("/voice/status/{call_sid}")
+async def voice_status(call_sid: str):
+    from app.tools.calling import booking_calls
+
+    # Check inbound conversations first
+    history = _get_history(call_sid)
+    if history:
+        return {
+            "call_sid":   call_sid,
+            "active":     True,
+            "turns":      len(history),
+            "transcript": history,
+            "type":       "inbound",
+        }
+
+    # Check outbound booking calls
+    ctx = booking_calls.get(call_sid, {})
+    if ctx:
+        transcript = ctx.get("transcript", [])
+        return {
+            "call_sid":   call_sid,
+            "active":     ctx.get("status") == "calling",
+            "turns":      len(transcript),
+            "transcript": transcript,
+            "type":       "outbound",
+            "business":   ctx.get("business_name", ""),
+            "booked_time": ctx.get("booked_time", ""),
+            "status":     ctx.get("status", "unknown"),
+        }
+
+    return {
+        "call_sid":   call_sid,
+        "active":     False,
+        "turns":      0,
+        "transcript": [],
     }
+
+async def call_business(params: dict = {}) -> dict:
+    name    = params.get("name") or params.get("salon_name", "the business")
+    phone   = params.get("phone_number") or params.get("phone", "")
+    date    = params.get("date", "tomorrow")
+    time_   = params.get("time", params.get("time_preference", "afternoon"))
+    service = params.get("service", "haircut")
+    client_name = params.get("client_name", params.get("name", "my client"))
+
+    if not settings.TWILIO_ACCOUNT_SID:
+        return {
+            "status":  "simulated",
+            "message": f"Jarvis would call {name} to book {service} on {date} at {time_}",
+            "note":    "Add Twilio credentials to enable real calling",
+        }
+
+    if not phone:
+        # No phone number — try to get it from Google Maps
+        return {
+            "status":  "no_phone",
+            "message": f"Found {name} but no phone number available. Please call them directly or provide a phone number.",
+            "business": name,
+            "address": params.get("address", ""),
+        }
+
+    try:
+        loop   = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None, _make_negotiation_call,
+            name, phone, date, time_, service, client_name
+        )
+        return result
+    except Exception as exc:
+        logger.error(f"Call failed: {exc}")
+        return {
+            "status":  "failed",
+            "message": f"Could not reach {name}. You may want to call them directly.",
+            "business": name,
+            "phone": phone,
+        }
