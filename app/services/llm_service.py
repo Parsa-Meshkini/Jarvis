@@ -10,28 +10,29 @@ client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
 async def generate_plan(user_input: str, system_prompt: str) -> dict:
-    full_prompt = f"""{system_prompt}
-
-USER REQUEST:
-{user_input}
-
-Respond ONLY with valid JSON. No markdown, no explanation, just JSON.
-"""
-
     try:
         response = await client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are a JSON-only response bot. Never use markdown. Always respond with valid JSON."},
-                {"role": "user",   "content": full_prompt},
+                {
+                    "role": "system",
+                    "content": system_prompt + "\n\nCRITICAL: Return ONLY valid JSON. No markdown, no code fences, no explanation."
+                },
+                {
+                    "role": "user",
+                    "content": f"""USER REQUEST: {user_input}
+
+REMINDER: For booking requests you MUST include ALL 4 steps: search_places, check_calendar, call_business, add_to_calendar.
+
+Return ONLY the JSON object."""
+                },
             ],
             max_tokens=1000,
-            temperature=0.3,
+            temperature=0.1,
         )
 
         text = response.choices[0].message.content.strip()
 
-        # Strip markdown fences if present
         if "```" in text:
             lines = text.split("\n")
             lines = [l for l in lines if not l.strip().startswith("```")]
