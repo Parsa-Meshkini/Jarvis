@@ -13,9 +13,8 @@ from app.services.auth_service import (
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
-router = APIRouter(redirect_slashes=False)
 
-router = APIRouter()
+router = APIRouter(redirect_slashes=False)
 
 GOOGLE_AUTH_URL  = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -82,7 +81,7 @@ async def google_login():
         "access_type":   "offline",   # get refresh token
         "prompt":        "consent",   # always show consent to get refresh token
     }
-    query  = "&".join(f"{k}={v}" for k, v in params.items())
+    query = urllib.parse.urlencode(params)
     return RedirectResponse(url=f"{GOOGLE_AUTH_URL}?{query}")
 
 

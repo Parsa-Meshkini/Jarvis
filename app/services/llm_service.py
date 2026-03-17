@@ -1,25 +1,12 @@
-# app/services/llm_service.py
 import os
 import asyncio
 import json
-from concurrent.futures import ThreadPoolExecutor
-import google.generativeai as genai
+from openai import AsyncOpenAI
 from dotenv import load_dotenv
 
 load_dotenv()
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-
-model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-1.5-flash"))
-
-# Thread pool for running sync Gemini calls without blocking
-_executor = ThreadPoolExecutor(max_workers=4)
-
-
-def _call_gemini(prompt: str) -> str:
-    """Synchronous Gemini call — runs in thread pool."""
-    response = model.generate_content(prompt)
-    return response.text
+client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
 async def generate_plan(user_input: str, system_prompt: str) -> dict:
@@ -31,26 +18,39 @@ USER REQUEST:
 Respond ONLY with valid JSON. No markdown, no explanation, just JSON.
 """
 
-    loop = asyncio.get_event_loop()
-
-    # Run the blocking Gemini call in a separate thread
-    text = await loop.run_in_executor(_executor, _call_gemini, full_prompt)
-    text = text.strip()
-
-    # Strip markdown fences if Gemini wraps output in ```json ... ```
-    if "```" in text:
-        lines = text.split("\n")
-        lines = [l for l in lines if not l.strip().startswith("```")]
-        text = "\n".join(lines).strip()
-
     try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        start = text.find("{")
-        end   = text.rfind("}") + 1
-        if start != -1 and end > start:
-            try:
-                return json.loads(text[start:end])
-            except Exception:
-                pass
-        return {"goal": "parse_error", "steps": [], "raw_output": text}
+        response = await client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a JSON-only response bot. Never use markdown. Always respond with valid JSON."},
+                {"role": "user",   "content": full_prompt},
+            ],
+            max_tokens=1000,
+            temperature=0.3,
+        )
+
+        text = response.choices[0].message.content.strip()
+
+        # Strip markdown fences if present
+        if "```" in text:
+            lines = text.split("\n")
+            lines = [l for l in lines if not l.strip().startswith("```")]
+            text  = "\n".join(lines).strip()
+
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            start = text.find("{")
+            end   = text.rfind("}") + 1
+            if start != -1 and end > start:
+                try:
+                    return json.loads(text[start:end])
+                except Exception:
+                    pass
+            return {"goal": "parse_error", "steps": [], "raw_output": text}
+
+    except Exception as exc:
+        error_str = str(exc)
+        if "429" in error_str or "quota" in error_str.lower():
+            return {"goal": "rate_limit_error", "steps": [], "error": "Rate limit hit — try again in a moment"}
+        return {"goal": "llm_error", "steps": [], "error": error_str}

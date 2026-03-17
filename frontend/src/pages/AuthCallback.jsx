@@ -19,7 +19,7 @@ export default function AuthCallback() {
     } else {
       navigate('/login')
     }
-  }, [])
+  }, [navigate, setAuth])
 
   return (
     <div className="min-h-screen bg-jarvis-bg flex items-center justify-center">
