@@ -1,7 +1,5 @@
 services:
 
-  # ── Infrastructure ─────────────────────────────────────────────────────────
-
   postgres:
     image: postgres:16-alpine
     environment:
@@ -29,8 +27,6 @@ services:
       interval: 5s
       timeout:  5s
       retries:  5
-
-  # ── Application ────────────────────────────────────────────────────────────
 
   api:
     build:
@@ -70,6 +66,29 @@ services:
         condition: service_healthy
     volumes:
       - .:/app
+    restart: unless-stopped
+
+  frontend:
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    command: http api:8000 --log=stdout
+    ports:
+      - "4040:4040"
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
+    depends_on:
+      - api
     restart: unless-stopped
 
 volumes:

@@ -163,3 +163,29 @@ async def delete_memory(key: str):
     from app.agents.memory import delete_preference
     await delete_preference(key=key)
     return {"status": "deleted", "key": key}
+
+class CallTestRequest(BaseModel):
+    business_name:  str
+    phone_number:   str
+    service:        str = "haircut"
+    date:           str = "tomorrow"
+    preferred_time: str = "afternoon"
+
+
+@router.post("/test-call")
+async def test_call(body: CallTestRequest):
+    """
+    Directly triggers a real phone call to a business.
+    Use this to test voice calling without running the full agent.
+    """
+    from app.tools.calling import call_business
+
+    result = await call_business({
+        "name":            body.business_name,
+        "phone_number":    body.phone_number,
+        "service":         body.service,
+        "date":            body.date,
+        "time_preference": body.preferred_time,
+    })
+
+    return result

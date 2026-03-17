@@ -1,7 +1,11 @@
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from app.api.routes import router
+from app.api.voice  import router as voice_router
+from app.api.auth   import router as auth_router
 from app.core.config import settings
 from app.database import engine, Base
 
@@ -16,16 +20,26 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title=settings.APP_NAME, lifespan=lifespan)
 
-# Allow requests from the React frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 app.include_router(router)
+app.include_router(voice_router)
+app.include_router(auth_router)
+
+
+@app.get("/voice/audio/{filename}")
+async def serve_audio(filename: str):
+    filepath = f"/tmp/{filename}"
+    if not os.path.exists(filepath):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Audio not found")
+    return FileResponse(filepath, media_type="audio/mpeg")
 
 
 @app.get("/")
