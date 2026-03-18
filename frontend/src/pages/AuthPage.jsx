@@ -35,7 +35,7 @@ export default function AuthPage({ mode = 'login' }) {
         {/* Logo */}
         <div className="text-center mb-8">
         <button onClick={() => navigate('/')} className="inline-flex items-center gap-3 hover:opacity-80 transition-opacity">
-          <img src="public/android-chrome-192x192.png" alt="Jarvis" className="w-10 h-10 rounded-xl object-cover" />
+          <img src="/android-chrome-192x192.png" alt="Jarvis" className="w-10 h-10 rounded-xl object-cover" />
           <span className="font-display text-jarvis-text text-xl">Jarvis</span>
         </button>
         </div>

@@ -132,7 +132,7 @@ export default function OnboardingPage() {
           <div className="w-12 h-12 rounded-xl bg-jarvis-accent/20 border border-jarvis-accent/40 flex items-center justify-center mx-auto mb-6 animate-glow-pulse">
             {/* Replace the J div with actual logo */}
             <img
-              src="public/android-chrome-192x192.png"
+              src="/android-chrome-192x192.png"
               alt="Jarvis"
               className="w-12 h-12 rounded-xl object-cover mx-auto mb-6"
             />          

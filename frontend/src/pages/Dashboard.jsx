@@ -75,7 +75,7 @@ export default function Dashboard() {
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-jarvis-accent/20 border border-jarvis-accent/40 flex items-center justify-center animate-glow-pulse">
             {/* Replace the J div */}
-            <img src="resources/android-chrome-192x192.png" alt="Jarvis" className="w-8 h-8 rounded-lg object-cover" />            
+            <img src="/android-chrome-192x192.png" alt="Jarvis" className="w-8 h-8 rounded-lg object-cover" />            
           </div>
           <div>
             <h1 className="font-display text-jarvis-text text-lg leading-none">Jarvis</h1>
