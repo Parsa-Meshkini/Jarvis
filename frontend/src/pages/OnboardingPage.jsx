@@ -130,7 +130,12 @@ export default function OnboardingPage() {
         {/* Card */}
         <div className="bg-jarvis-surface border border-jarvis-border rounded-2xl p-10 text-center">
           <div className="w-12 h-12 rounded-xl bg-jarvis-accent/20 border border-jarvis-accent/40 flex items-center justify-center mx-auto mb-6 animate-glow-pulse">
-            <span className="font-mono text-jarvis-accent">J</span>
+            {/* Replace the J div with actual logo */}
+            <img
+              src="public/android-chrome-192x192.png"
+              alt="Jarvis"
+              className="w-12 h-12 rounded-xl object-cover mx-auto mb-6"
+            />          
           </div>
 
           <h2 className="font-display text-3xl text-jarvis-text mb-2">

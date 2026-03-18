@@ -87,7 +87,6 @@ async def _get_jarvis_reply(user_input: str, history: list, call_sid: str) -> st
     client  = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
     context = await build_user_context()
 
-    # Build a rich system prompt with user's actual details
     system = f"""You are Jarvis, a helpful AI assistant on a phone call.
 
 ABOUT THE USER:
@@ -219,13 +218,10 @@ async def voice_incoming(request: Request):
     form      = await request.form()
     call_sid  = form.get("CallSid", "unknown")
     logger.info(f"Incoming call: {call_sid}")
-
     ngrok_url = await get_ngrok_url()
     greeting  = "Hello, I am Jarvis your personal AI assistant. How can I help you today?"
-
-    history = [{"role": "assistant", "content": greeting}]
+    history   = [{"role": "assistant", "content": greeting}]
     _save_history(call_sid, history)
-
     return Response(
         content=_respond_with_voice(
             text=greeting,
@@ -247,7 +243,6 @@ async def voice_booking_respond(
     logger.info(f"[{CallSid}] Heard: '{SpeechResult}' (confidence: {Confidence})")
     ngrok_url = await get_ngrok_url()
 
-    # Handle empty speech
     if not SpeechResult.strip():
         empty_count = conversations.get(f"{CallSid}_empty", 0) + 1
         conversations[f"{CallSid}_empty"] = empty_count
@@ -267,19 +262,14 @@ async def voice_booking_respond(
             media_type="application/xml",
         )
 
-    # Reset empty counter
     conversations.pop(f"{CallSid}_empty", None)
-
-    # Load history → add user turn → get reply → save
     history = _get_history(CallSid)
     logger.info(f"[{CallSid}] History has {len(history)} previous turns")
-
     history.append({"role": "user", "content": SpeechResult})
     reply = await _get_jarvis_reply(SpeechResult, history, CallSid)
     history.append({"role": "assistant", "content": reply})
     _save_history(CallSid, history)
 
-    # End call if user says goodbye
     end_phrases = ["goodbye", "bye", "hang up", "that's all", "thanks bye", "thank you goodbye"]
     if any(p in SpeechResult.lower() for p in end_phrases):
         return Response(content=_end_call(reply), media_type="application/xml")
@@ -299,20 +289,39 @@ async def voice_booking_respond(
 
 @router.get("/voice/status/{call_sid}")
 async def voice_status(call_sid: str):
+    from app.tools.calling import booking_calls
+
     history = _get_history(call_sid)
-    return {
-        "call_sid":   call_sid,
-        "active":     bool(history),
-        "turns":      len(history),
-        "transcript": history,
-    }
+    if history:
+        return {
+            "call_sid":   call_sid,
+            "active":     True,
+            "turns":      len(history),
+            "transcript": history,
+            "type":       "inbound",
+        }
+
+    ctx = booking_calls.get(call_sid, {})
+    if ctx:
+        transcript = ctx.get("transcript", [])
+        return {
+            "call_sid":    call_sid,
+            "active":      ctx.get("status") == "calling",
+            "turns":       len(transcript),
+            "transcript":  transcript,
+            "type":        "outbound",
+            "business":    ctx.get("business_name", ""),
+            "booked_time": ctx.get("booked_time", ""),
+            "status":      ctx.get("status", "unknown"),
+        }
+
+    return {"call_sid": call_sid, "active": False, "turns": 0, "transcript": []}
 
 
 @router.get("/voice/active")
 async def active_calls():
     from app.tools.calling import booking_calls
 
-    # Combine inbound conversations + outbound booking calls
     active = []
 
     for sid, h in conversations.items():
@@ -336,81 +345,3 @@ async def active_calls():
         })
 
     return {"active_calls": active}
-
-
-@router.get("/voice/status/{call_sid}")
-async def voice_status(call_sid: str):
-    from app.tools.calling import booking_calls
-
-    # Check inbound conversations first
-    history = _get_history(call_sid)
-    if history:
-        return {
-            "call_sid":   call_sid,
-            "active":     True,
-            "turns":      len(history),
-            "transcript": history,
-            "type":       "inbound",
-        }
-
-    # Check outbound booking calls
-    ctx = booking_calls.get(call_sid, {})
-    if ctx:
-        transcript = ctx.get("transcript", [])
-        return {
-            "call_sid":   call_sid,
-            "active":     ctx.get("status") == "calling",
-            "turns":      len(transcript),
-            "transcript": transcript,
-            "type":       "outbound",
-            "business":   ctx.get("business_name", ""),
-            "booked_time": ctx.get("booked_time", ""),
-            "status":     ctx.get("status", "unknown"),
-        }
-
-    return {
-        "call_sid":   call_sid,
-        "active":     False,
-        "turns":      0,
-        "transcript": [],
-    }
-
-async def call_business(params: dict = {}) -> dict:
-    name    = params.get("name") or params.get("salon_name", "the business")
-    phone   = params.get("phone_number") or params.get("phone", "")
-    date    = params.get("date", "tomorrow")
-    time_   = params.get("time", params.get("time_preference", "afternoon"))
-    service = params.get("service", "haircut")
-    client_name = params.get("client_name", params.get("name", "my client"))
-
-    if not settings.TWILIO_ACCOUNT_SID:
-        return {
-            "status":  "simulated",
-            "message": f"Jarvis would call {name} to book {service} on {date} at {time_}",
-            "note":    "Add Twilio credentials to enable real calling",
-        }
-
-    if not phone:
-        # No phone number — try to get it from Google Maps
-        return {
-            "status":  "no_phone",
-            "message": f"Found {name} but no phone number available. Please call them directly or provide a phone number.",
-            "business": name,
-            "address": params.get("address", ""),
-        }
-
-    try:
-        loop   = asyncio.get_event_loop()
-        result = await loop.run_in_executor(
-            None, _make_negotiation_call,
-            name, phone, date, time_, service, client_name
-        )
-        return result
-    except Exception as exc:
-        logger.error(f"Call failed: {exc}")
-        return {
-            "status":  "failed",
-            "message": f"Could not reach {name}. You may want to call them directly.",
-            "business": name,
-            "phone": phone,
-        }

@@ -74,7 +74,8 @@ export default function Dashboard() {
       <header className="flex items-center justify-between px-6 py-4 border-b border-jarvis-border">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-jarvis-accent/20 border border-jarvis-accent/40 flex items-center justify-center animate-glow-pulse">
-            <span className="font-mono text-jarvis-accent text-sm">J</span>
+            {/* Replace the J div */}
+            <img src="resources/android-chrome-192x192.png" alt="Jarvis" className="w-8 h-8 rounded-lg object-cover" />            
           </div>
           <div>
             <h1 className="font-display text-jarvis-text text-lg leading-none">Jarvis</h1>
@@ -176,9 +177,7 @@ export default function Dashboard() {
                 {activeTask && !loading && <TaskCard task={activeTask} isLatest={true} />}
                 {!activeTask && !loading && !error && (
                   <div className="flex flex-col items-center justify-center py-20 gap-3">
-                    <div className="w-16 h-16 rounded-2xl bg-jarvis-surface border border-jarvis-border flex items-center justify-center">
-                      <span className="font-display text-jarvis-accent text-2xl">J</span>
-                    </div>
+                    <img src="/android-chrome-192x192.png" alt="Jarvis" className="w-16 h-16 rounded-2xl object-cover" />
                     <p className="font-display text-jarvis-text text-xl">Ready, {user?.name || 'there'}</p>
                     <p className="font-mono text-jarvis-muted text-xs">Give Jarvis a command above</p>
                     <div className="flex flex-wrap gap-2 mt-4 justify-center max-w-md">

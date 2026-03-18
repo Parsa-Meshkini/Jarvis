@@ -1,7 +1,7 @@
 import logging
 import urllib.parse
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -71,15 +71,17 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/auth/google")
-async def google_login():
+@router.get("/auth/google/")
+async def google_login(request: Request):
     """Redirect user to Google OAuth consent screen."""
+    # Use the configured redirect URI (must match Google Console exactly)
     params = {
         "client_id":     settings.GOOGLE_CLIENT_ID,
         "redirect_uri":  settings.GOOGLE_REDIRECT_URI,
         "response_type": "code",
         "scope":         GOOGLE_SCOPES,
-        "access_type":   "offline",   # get refresh token
-        "prompt":        "consent",   # always show consent to get refresh token
+        "access_type":   "offline",
+        "prompt":        "consent",
     }
     query = urllib.parse.urlencode(params)
     return RedirectResponse(url=f"{GOOGLE_AUTH_URL}?{query}")

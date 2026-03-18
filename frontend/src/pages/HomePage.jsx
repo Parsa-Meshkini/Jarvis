@@ -18,9 +18,11 @@ export default function HomePage() {
       {/* Nav */}
       <nav className="flex items-center justify-between px-8 py-5 border-b border-jarvis-border">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-jarvis-accent/20 border border-jarvis-accent/40 flex items-center justify-center">
-            <span className="font-mono text-jarvis-accent text-sm">J</span>
-          </div>
+        {/* Nav logo */}
+        <div className="flex items-center gap-3">
+          <img src="resources/android-chrome-192x192.png" alt="Jarvis" className="w-8 h-8 rounded-lg object-cover" />
+          <span className="font-display text-jarvis-text text-lg">Jarvis</span>
+        </div>
           <span className="font-display text-jarvis-text text-lg">Jarvis</span>
         </div>
         <div className="flex items-center gap-3">
@@ -42,6 +44,8 @@ export default function HomePage() {
       {/* Hero */}
       <section className="flex flex-col items-center justify-center text-center px-6 py-28 gap-6">
         <div className="inline-flex items-center gap-2 border border-jarvis-accent/30 bg-jarvis-accent/5 text-jarvis-accent font-mono text-xs px-4 py-2 rounded-full mb-2">
+          {/* Remove the demo window dots and replace logo reference */}
+          <img src="/android-chrome-192x192.png" alt="Jarvis" className="w-8 h-8 rounded-lg" />
           <span className="w-2 h-2 bg-jarvis-green rounded-full animate-pulse" />
           autonomous AI assistant
         </div>
