@@ -8,7 +8,7 @@ export default function Logo({ size = 'md', showText = true }) {
   return (
     <div className="flex items-center gap-3">
       <img
-        src="/android-chrome-192x192.png"
+        src="/jarvis-logo.svg"
         alt="Jarvis"
         className={`${sizes[size]} rounded-xl object-cover`}
       />

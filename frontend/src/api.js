@@ -1,6 +1,9 @@
 import axios from 'axios'
 
-const BASE = 'http://localhost:8000'
+/** Backend origin — use VITE_API_URL in .env when API is not on localhost:8000 */
+export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
+const BASE = API_BASE
 
 const api = axios.create({
   baseURL: BASE,

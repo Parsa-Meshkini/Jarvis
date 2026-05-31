@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.task import User
 import os
+from fastapi import Depends, HTTPException, Request
 
 SECRET_KEY = os.getenv("SECRET_KEY", "jarvis-secret-key-change-in-production")
 ALGORITHM  = "HS256"
@@ -36,6 +37,33 @@ def decode_token(token: str) -> dict:
         return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     except JWTError:
         return {}
+
+
+def _extract_bearer_token(request: Request) -> str:
+    auth = request.headers.get("Authorization", "")
+    if not auth:
+        return ""
+    parts = auth.split(" ", 1)
+    if len(parts) != 2:
+        return ""
+    scheme, token = parts[0].strip().lower(), parts[1].strip()
+    if scheme != "bearer":
+        return ""
+    return token
+
+
+async def get_current_user(request: Request) -> dict:
+    """
+    FastAPI dependency that returns JWT claims.
+    Raises 401 when token is missing/invalid.
+    """
+    token = _extract_bearer_token(request)
+    if not token:
+        raise HTTPException(status_code=401, detail="Missing bearer token")
+    claims = decode_token(token)
+    if not claims.get("sub"):
+        raise HTTPException(status_code=401, detail="Invalid token")
+    return claims
 
 
 async def get_user_by_email(email: str, db: AsyncSession) -> User | None:

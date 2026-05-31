@@ -32,7 +32,10 @@ class Settings:
     
     GOOGLE_CLIENT_ID:     str = os.getenv("GOOGLE_CLIENT_ID", "")
     GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
+    # Must match an "Authorized redirect URI" in Google Cloud Console (exact string).
     GOOGLE_REDIRECT_URI:  str = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/auth/google/callback")
+    # Where the browser loads the React app. After Google OAuth, the API redirects here (use HTTPS if the
+    # OAuth callback was HTTPS and your browser blocks https→http redirects — e.g. same host on ngrok).
     FRONTEND_URL:         str = os.getenv("FRONTEND_URL", "http://localhost:3000")
     SECRET_KEY:           str = os.getenv("SECRET_KEY", "jarvis-secret-change-in-production")
 

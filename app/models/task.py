@@ -23,6 +23,8 @@ class Task(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
+    # Owner — JWT "sub" (uuid string). Existing rows may be NULL (legacy).
+    user_id:      Mapped[str|None] = mapped_column(String(100), nullable=True, index=True)
     user_request: Mapped[str]      = mapped_column(Text, nullable=False)
     status:       Mapped[str]      = mapped_column(String(20), default=TaskStatus.QUEUED)
     result:       Mapped[str|None] = mapped_column(Text, nullable=True)

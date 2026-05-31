@@ -12,6 +12,7 @@ from app.agents.executor import execute_plan
 from app.database import get_db
 from app.models.task import Task, TaskStep, TaskStatus
 from app.core.config import settings
+from app.services.auth_service import get_current_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -31,14 +32,21 @@ async def _get_arq() -> ArqRedis:
 async def command(
     body: CommandRequest,
     db: AsyncSession = Depends(get_db),
+    user: dict = Depends(get_current_user),
 ):
-    task = Task(user_request=body.user_input, status=TaskStatus.QUEUED)
+    task = Task(
+        user_id=str(user.get("sub")),
+        user_request=body.user_input,
+        status=TaskStatus.QUEUED,
+    )
     db.add(task)
     await db.commit()
     await db.refresh(task)
 
     try:
         redis = await _get_arq()
+        # Note: worker currently doesn't scope planner/memory by user.
+        # Tasks are still isolated via DB queries and the stored task.user_id.
         await redis.enqueue_job("run_agent_task", str(task.id), body.user_input)
         await redis.aclose()
         return {
@@ -69,7 +77,7 @@ async def command(
             task.status = TaskStatus.EXECUTING
             await db.commit()
 
-            execution   = await execute_plan(plan)
+            execution   = await execute_plan(plan, user_id=task.user_id)
             task.status = TaskStatus.COMPLETED
             task.result = execution.get("status", "completed")
             await db.commit()
@@ -88,10 +96,15 @@ async def command(
             raise
 
 @router.get("/tasks")
-async def list_tasks(db: AsyncSession = Depends(get_db)):
+async def list_tasks(
+    db: AsyncSession = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    user_id = str(user.get("sub"))
     result = await db.execute(
         select(Task)
         .options(selectinload(Task.steps))
+        .where(Task.user_id == user_id)
         .order_by(Task.created_at.desc())
         .limit(20)
     )
@@ -113,11 +126,17 @@ async def list_tasks(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/tasks/{task_id}")
-async def get_task(task_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def get_task(
+    task_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    user_id = str(user.get("sub"))
     result = await db.execute(
         select(Task)
         .options(selectinload(Task.steps))
         .where(Task.id == task_id)
+        .where(Task.user_id == user_id)
     )
     task = result.scalar_one_or_none()
     if not task:
@@ -142,26 +161,26 @@ class MemoryRequest(BaseModel):
 
 
 @router.get("/memory")
-async def get_memory():
+async def get_memory(user: dict = Depends(get_current_user)):
     """Get all stored user preferences."""
     from app.agents.memory import get_all_preferences
-    prefs = await get_all_preferences()
+    prefs = await get_all_preferences(user_id=str(user.get("sub")))
     return {"preferences": prefs}
 
 
 @router.post("/memory")
-async def set_memory(body: MemoryRequest):
+async def set_memory(body: MemoryRequest, user: dict = Depends(get_current_user)):
     """Save a user preference."""
     from app.agents.memory import save_preference
-    await save_preference(key=body.key, value=body.value)
+    await save_preference(key=body.key, value=body.value, user_id=str(user.get("sub")))
     return {"status": "saved", "key": body.key, "value": body.value}
 
 
 @router.delete("/memory/{key}")
-async def delete_memory(key: str):
+async def delete_memory(key: str, user: dict = Depends(get_current_user)):
     """Delete a user preference."""
     from app.agents.memory import delete_preference
-    await delete_preference(key=key)
+    await delete_preference(key=key, user_id=str(user.get("sub")))
     return {"status": "deleted", "key": key}
 
 class CallTestRequest(BaseModel):
@@ -173,7 +192,7 @@ class CallTestRequest(BaseModel):
 
 
 @router.post("/test-call")
-async def test_call(body: CallTestRequest):
+async def test_call(body: CallTestRequest, user: dict = Depends(get_current_user)):
     """
     Directly triggers a real phone call to a business.
     Use this to test voice calling without running the full agent.
@@ -186,6 +205,7 @@ async def test_call(body: CallTestRequest):
         "service":         body.service,
         "date":            body.date,
         "time_preference": body.preferred_time,
+        "user_id":         str(user.get("sub")),
     })
 
     return result

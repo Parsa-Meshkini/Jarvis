@@ -3,11 +3,43 @@ import logging
 import os
 import time
 from app.core.config import settings
+import json
+import redis as redis_sync
 
 logger = logging.getLogger(__name__)
 
 # Store active booking call state
 booking_calls: dict[str, dict] = {}
+
+def _get_redis_client():
+    try:
+        url = settings.REDIS_URL.replace("redis://", "")
+        host, port = url.split(":")
+        return redis_sync.Redis(
+            host=host,
+            port=int(port),
+            decode_responses=True,
+            socket_connect_timeout=2,
+        )
+    except Exception:
+        return None
+
+
+def _persist_call_owner_and_meta(call_sid: str, user_id: str | None, meta: dict) -> None:
+    """
+    Persist call ownership in Redis so the API (different process/container)
+    can enforce per-user isolation and still show live transcript.
+    """
+    if not user_id:
+        return
+    r = _get_redis_client()
+    if not r:
+        return
+    try:
+        r.setex(f"voice_owner:{call_sid}", 3600, str(user_id))
+        r.setex(f"voice_meta:{call_sid}", 3600, json.dumps(meta))
+    except Exception:
+        pass
 
 
 async def call_business(params: dict = {}) -> dict:
@@ -17,6 +49,7 @@ async def call_business(params: dict = {}) -> dict:
     time_   = params.get("time", params.get("time_preference", "afternoon"))
     service = params.get("service", "haircut")
     client_name = params.get("client_name", "my client")
+    user_id = params.get("user_id")
 
     if not settings.TWILIO_ACCOUNT_SID:
         return {
@@ -34,7 +67,7 @@ async def call_business(params: dict = {}) -> dict:
         loop   = asyncio.get_event_loop()
         result = await loop.run_in_executor(
             None, _make_negotiation_call,
-            name, phone, date, time_, service, client_name
+            name, phone, date, time_, service, client_name, user_id
         )
         return result
     except Exception as exc:
@@ -44,7 +77,7 @@ async def call_business(params: dict = {}) -> dict:
 
 def _make_negotiation_call(
     name: str, phone: str, date: str,
-    time_: str, service: str, client_name: str
+    time_: str, service: str, client_name: str, user_id: str | None = None
 ) -> dict:
     from twilio.rest import Client
 
@@ -63,6 +96,7 @@ def _make_negotiation_call(
         "time":          time_,
         "service":       service,
         "client_name":   client_name,
+        "user_id":       user_id,
         "transcript":    [],
         "status":        "calling",
         "booked_time":   None,
@@ -76,9 +110,13 @@ def _make_negotiation_call(
         f"Do you have any availability in the {time_}?"
     )
 
+    action = f"{ngrok_url}/voice/booking-respond"
+    if user_id:
+        action = f"{action}?uid={user_id}"
+
     twiml = _build_gather_twiml(
         text=opening,
-        action_url=f"{ngrok_url}/voice/booking-respond",
+        action_url=action,
         voice_id=settings.ELEVENLABS_VOICE_ID,
     )
 
@@ -92,6 +130,11 @@ def _make_negotiation_call(
 
     # Store context keyed by call SID
     booking_calls[call.sid] = call_context
+    _persist_call_owner_and_meta(
+        call_sid=call.sid,
+        user_id=user_id,
+        meta={"business_name": name, "status": "calling"},
+    )
 
     logger.info(f"Negotiation call started: {call.sid} to {phone}")
 

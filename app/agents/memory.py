@@ -63,12 +63,12 @@ async def delete_preference(key: str, user_id: str = DEFAULT_USER) -> None:
         await db.commit()
 
 
-async def build_user_context() -> dict:
+async def build_user_context(user_id: str = DEFAULT_USER) -> dict:
     """
     Builds a context dict passed to the planner.
     Jarvis uses this to personalise every task.
     """
-    prefs = await get_all_preferences()
+    prefs = await get_all_preferences(user_id=user_id)
     return {
         "location":          prefs.get("location", "Toronto, ON"),
         "preferred_time":    prefs.get("preferred_time", "afternoon"),

@@ -49,7 +49,7 @@ async def run_agent_task(ctx: dict, task_id: str, user_input: str) -> str:
             await db.commit()
 
             # Execute plan
-            execution = await execute_plan(plan)
+            execution = await execute_plan(plan, user_id=task.user_id)
 
             # Save result
             task.status = TaskStatus.COMPLETED

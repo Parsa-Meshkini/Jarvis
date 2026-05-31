@@ -18,10 +18,10 @@ TOOL_MAP = {
 }
 
 
-async def execute_plan(plan: dict) -> dict:
+async def execute_plan(plan: dict, user_id: str | None = None) -> dict:
     steps   = plan.get("steps", [])
     results = []
-    context = {}
+    context = {"user_id": user_id} if user_id else {}
 
     for i, step in enumerate(steps):
         tool_name = step.get("tool")

@@ -1,15 +1,30 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { login, register } from '../api'
+import { useState, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { login, register, API_BASE } from '../api'
 import useAuthStore from '../store/authStore'
 
 export default function AuthPage({ mode = 'login' }) {
-  const navigate  = useNavigate()
-  const setAuth   = useAuthStore(s => s.setAuth)
+  const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const setAuth = useAuthStore((s) => s.setAuth)
   const [isLogin, setIsLogin] = useState(mode === 'login')
-  const [form, setForm]       = useState({ name: '', email: '', password: '' })
-  const [error, setError]     = useState('')
+  const [form, setForm] = useState({ name: '', email: '', password: '' })
+  const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    const q = searchParams.get('error')
+    if (q) {
+      const friendly =
+        q === 'missing_token'
+          ? 'Sign-in did not complete. Try Google again or use email and password.'
+          : q === 'access_denied'
+            ? 'Google sign-in was cancelled.'
+            : decodeURIComponent(q)
+      setError(friendly)
+      setSearchParams({}, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -35,7 +50,7 @@ export default function AuthPage({ mode = 'login' }) {
         {/* Logo */}
         <div className="text-center mb-8">
         <button onClick={() => navigate('/')} className="inline-flex items-center gap-3 hover:opacity-80 transition-opacity">
-          <img src="/android-chrome-192x192.png" alt="Jarvis" className="w-10 h-10 rounded-xl object-cover" />
+          <img src="/jarvis-logo.svg" alt="Jarvis" className="w-10 h-10 rounded-xl object-cover" />
           <span className="font-display text-jarvis-text text-xl">Jarvis</span>
         </button>
         </div>
@@ -51,7 +66,7 @@ export default function AuthPage({ mode = 'login' }) {
 
           {/* Google button — outside the form */}
           <a
-            href="http://localhost:8000/auth/google"
+            href={`${API_BASE}/auth/google`}
             className="flex items-center justify-center gap-3 w-full border border-jarvis-border
                        rounded-xl py-3 mb-4 hover:border-jarvis-accent/40 transition-colors"
           >

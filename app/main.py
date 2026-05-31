@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from sqlalchemy import text
 from app.api.routes import router
 from app.api.voice  import router as voice_router
 from app.api.auth   import router as auth_router
@@ -15,6 +16,13 @@ from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Lightweight schema patch for existing DBs created before task user scoping.
+        await conn.execute(text(
+            "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS user_id VARCHAR(100)"
+        ))
+        await conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_tasks_user_id ON tasks (user_id)"
+        ))
     yield
     await engine.dispose()
 
